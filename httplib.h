@@ -165,11 +165,11 @@ using ssize_t = long;
 #endif // _MSC_VER
 
 #ifndef S_ISREG
-#define S_ISREG(m) (((m) & S_IFREG) == S_IFREG)
+#define S_ISREG(m) (((m)&S_IFREG) == S_IFREG)
 #endif // S_ISREG
 
 #ifndef S_ISDIR
-#define S_ISDIR(m) (((m) & S_IFDIR) == S_IFDIR)
+#define S_ISDIR(m) (((m)&S_IFDIR) == S_IFDIR)
 #endif // S_ISDIR
 
 #ifndef NOMINMAX
@@ -365,8 +365,9 @@ inline unsigned char to_lower(int c) {
 
 inline bool equal(const std::string &a, const std::string &b) {
   return a.size() == b.size() &&
-         std::equal(a.begin(), a.end(), b.begin(),
-                    [](char ca, char cb) { return to_lower(ca) == to_lower(cb); });
+         std::equal(a.begin(), a.end(), b.begin(), [](char ca, char cb) {
+           return to_lower(ca) == to_lower(cb);
+         });
 }
 
 struct equal_to {
@@ -764,6 +765,7 @@ public:
         return false;
       }
       jobs_.push_back(std::move(fn));
+      idle_.clear();
     }
 
     cond_.notify_one();
@@ -801,7 +803,9 @@ private:
           if (pool_.shutdown_ && pool_.jobs_.empty()) { break; }
 
           fn = pool_.jobs_.front();
-          pool_.jobs_.pop_front();
+          // pool_.jobs_.pop_front();
+          pool_.idle_.splice(pool_.idle_.end(), pool_.jobs_,
+                             pool_.jobs_.begin());
         }
 
         assert(true == static_cast<bool>(fn));
@@ -820,6 +824,7 @@ private:
 
   std::vector<std::thread> threads_;
   std::list<std::function<void()>> jobs_;
+  std::list<std::function<void()>> idle_;
 
   bool shutdown_;
   size_t max_queued_requests_ = 0;
@@ -2896,9 +2901,7 @@ inline void stream_line_reader::append(char c) {
   }
 }
 
-inline mmap::mmap(const char *path) {
-  open(path);
-}
+inline mmap::mmap(const char *path) { open(path); }
 
 inline mmap::~mmap() { close(); }
 
